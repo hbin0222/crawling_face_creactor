@@ -1,4 +1,0 @@
-appscript==1.2.2
-lxml==4.9.2
-psutil==5.9.5
-xlwings==0.30.10
