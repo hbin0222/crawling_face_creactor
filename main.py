@@ -3,74 +3,87 @@ import tkinter as tk
 from tkinter import filedialog
 import requests
 from bs4 import BeautifulSoup
-# import cv2
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+import time
+import urllib.request
+#브라우저 꺼짐 방지
+chrome_options = Options()
+chrome_options.add_experimental_option("detach", True)
 
-def search_and_save_images():
-    search_query = search_entry.get()
-    directory_path = directory_var.get()
-    if directory_path:
-        crawl_and_save_images(search_query, directory_path)
+driver = webdriver.Chrome(options=chrome_options)
 
-def crawl_and_save_images(search_query, directory_path):
-    url = f"https://www.google.com/search?q={search_query}&tbm=isch"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
+#웹페이지 해당 주소 이동
+driver.get("https://www.google.co.kr/imghp?hl=ko&ogbl")
 
-    soup = BeautifulSoup(response.text, "html.parser")
-    image_elements = soup.find_all("img")
+def crawling():
+    search_query = search_entry.get() #검색어
+    dir_query = dir_entry.get() #디렉토리 경로
 
-    os.makedirs(directory_path, exist_ok=True)
+    #크롤링한 파일 모아둘 디렉토리 생성
+    if not os.path.isdir(f"{dir_query}/{search_query}/"): #디렉토리에 폴더가 없을경우 생성
+        os.makedirs(f"{dir_query}/{search_query}/")
+        print(f"{search_query}디렉토리 생성!")
+    else:
+        print(f"{search_query}디렉토리가 존재합니다.!")
+    #구글 검색창 선택
+    element = driver.find_element(By.NAME, "q") #find_element_by_name메서드가 삭제되고 대체되는 방법
+    element.send_keys(search_query)#입력받은 검색어 입력
+    element.send_keys(Keys.RETURN)# 검색시작
 
-    count = 0
-    for img_element in image_elements:
-        if count >= 10:
-            break
-        image_url = img_element["src"]
+    #모든 이미지를 불러올 시간을 주어야함
+    time.sleep(2)
+
+    imgs = driver.find_elements(By.CSS_SELECTOR, ".rg_i")#이미지들을 모두 선택
+    # with open('imgs.html', "w", encoding='utf8') as f:
+    #     for img in imgs:
+    #       f.write(str(img.get_attribute("outerHTML")) + "\n")
+    cnt=0
+    for img in imgs:
         try:
-            response = requests.get(image_url, headers=headers)
-            response.raise_for_status()
+            img.click()
+            time.sleep(0.5)
+            img_element = driver.find_element(By.CSS_SELECTOR, "img.r48jcc.pT0Scc.iPVvYb")
+            imgUrl = img_element.get_attribute("src")
+            print(imgUrl)
+            urllib.request.urlretrieve(imgUrl, f"{dir_query}/{search_query}/{search_query}_" + str(cnt) + ".jpg")
+            cnt += 1
+            if cnt >= 5:
+                break
+        except:
+            print("img error")
 
-            image_path = os.path.join(directory_path, f"{search_query}_{count}.jpg")
-            with open(image_path, "wb") as f:
-                f.write(response.content)
 
-            count += 1
-
-        except requests.exceptions.RequestException as e:
-            print(f"Error downloading image: {e}")
-
-# GUI 생성
+#GUI 생성
 window = tk.Tk()
-window.title("Image Crawler")
-window.geometry("300x250")
+window.title("Images Crawling")
+window.geometry("300x300+500+500")#창 크기 및 출현위치설정
 
-# 디렉토리 선택
-directory_label = tk.Label(window, text="디렉토리:")
-directory_label.pack()
-directory_var = tk.StringVar()
-directory_entry = tk.Entry(window, textvariable=directory_var)
-directory_entry.pack()
+#디렉토리 생성
+dir_label = tk.Label(window, text="디렉토리")
+dir_label.pack()
+dir_var = tk.StringVar() #문자열 객체 생성
+dir_entry = tk.Entry(window, textvariable=dir_var)
+dir_entry.pack()
 
-def choose_directory():
-    selected_directory = filedialog.askdirectory()
-    directory_var.set(selected_directory)
+def choose_dir():
+    sel_dir = filedialog.askdirectory()
+    dir_var.set(sel_dir)
 
-directory_button = tk.Button(window, text="디렉토리 선택", command=choose_directory)
-directory_button.pack()
+dir_btn = tk.Button(window, text="선택", command=choose_dir)
+dir_btn.pack()
 
-# 검색어 입력
-search_label = tk.Label(window, text="검색어:")
+#검색어 입력
+search_label = tk.Label(window, text="검색어")
 search_label.pack()
 search_entry = tk.Entry(window)
 search_entry.pack()
 
-def perform_search():
-    search_and_save_images()
-
-search_button = tk.Button(window, text="검색", command=perform_search)
-search_button.pack()
+def perform():
+    crawling()
+search_btn = tk.Button(window, text="검색", command=perform)
+search_btn.pack()
 
 window.mainloop()
